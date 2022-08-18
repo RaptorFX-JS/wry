@@ -1,5 +1,10 @@
 # Changelog
 
+## \[0.20.3]
+
+- Added `WebViewBuilder::with_allowed_self_signed_cert_url` API to allow an URL with self signed certificate to be loaded on mobile, useful for development servers.
+  - [8eebcd8](https://github.com/tauri-apps/wry/commit/8eebcd8770996c5ff6355958838086a5468a101d) feat(mobile): configure URLs to be allowed to load with self signed cert ([#664](https://github.com/tauri-apps/wry/pull/664)) on 2022-08-18
+
 ## \[0.20.2]
 
 - Implement custom protocol on Android.
