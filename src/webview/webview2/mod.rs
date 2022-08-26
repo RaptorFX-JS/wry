@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 mod file_drop;
+mod sync_ipc;
 
 use crate::{
   webview::{WebContext, WebViewAttributes},
@@ -10,6 +11,7 @@ use crate::{
 };
 
 use file_drop::FileDropController;
+use sync_ipc::SyncIPCHandler;
 
 use std::{collections::HashSet, mem::MaybeUninit, rc::Rc, sync::mpsc};
 
@@ -66,6 +68,9 @@ impl InnerWebView {
     let file_drop_handler = attributes.file_drop_handler.take();
     let file_drop_window = window.clone();
 
+    let sync_ipc_handler = attributes.sync_ipc_handler.take();
+    let sync_ipc_window = window.clone();
+
     let env = Self::create_environment(&web_context)?;
     let controller = Self::create_controller(hwnd, &env)?;
     let webview = Self::init_webview(window, hwnd, attributes, &env, &controller)?;
@@ -74,6 +79,10 @@ impl InnerWebView {
       let mut controller = FileDropController::new();
       controller.listen(hwnd, file_drop_window, file_drop_handler);
       let _ = file_drop_controller.set(controller);
+    }
+
+    if let Some(handler) = sync_ipc_handler {
+      SyncIPCHandler::new(sync_ipc_window, handler)?.inject(&webview)?;
     }
 
     Ok(Self {

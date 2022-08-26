@@ -120,6 +120,9 @@ pub struct WebViewAttributes {
   ///
   /// Both functions return promises but `notify()` resolves immediately.
   pub ipc_handler: Option<Box<dyn Fn(&Window, String)>>,
+  /// Set the blocking IPC handler to receive a message from Javascript and send back a response.
+  /// The message sent from webview should call `let response = window.ipc.postSyncMessage("message");`.
+  pub sync_ipc_handler: Option<Box<dyn Fn(&Window, String) -> String>>,
   /// Set a handler closure to process incoming [`FileDropEvent`] of the webview.
   ///
   /// # Blocking OS Default Behavior
@@ -175,6 +178,7 @@ impl Default for WebViewAttributes {
       initialization_scripts: vec![],
       custom_protocols: vec![],
       ipc_handler: None,
+      sync_ipc_handler: None,
       file_drop_handler: None,
       navigation_handler: None,
       new_window_req_handler: None,
@@ -272,6 +276,16 @@ impl<'a> WebViewBuilder<'a> {
     F: Fn(&Window, String) + 'static,
   {
     self.webview.ipc_handler = Some(Box::new(handler));
+    self
+  }
+
+  /// Set the blocking IPC handler to receive a message from Javascript and send back a response.
+  /// The message sent from webview should call `let response = window.ipc.postSyncMessage("message");`.
+  pub fn with_sync_ipc_handler<F>(mut self, handler: F) -> Self
+  where
+    F: (Fn(&Window, String) -> String) + 'static,
+  {
+    self.webview.sync_ipc_handler = Some(Box::new(handler));
     self
   }
 
