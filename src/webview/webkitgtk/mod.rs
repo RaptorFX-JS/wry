@@ -18,8 +18,8 @@ use gio::Cancellable;
 use glib::signal::Inhibit;
 use gtk::prelude::*;
 use webkit2gtk::{
-  traits::*, NavigationPolicyDecision, PolicyDecisionType, UserContentInjectedFrames, UserScript,
-  UserScriptInjectionTime, WebView, WebViewBuilder,
+  traits::*, NavigationPolicyDecision, PolicyDecisionType, ScriptDialogType,
+  UserContentInjectedFrames, UserScript, UserScriptInjectionTime, WebView, WebViewBuilder,
 };
 use webkit2gtk_sys::{
   webkit_get_major_version, webkit_get_micro_version, webkit_get_minor_version,
@@ -98,6 +98,24 @@ impl InnerWebView {
 
     // Register the handler we just connected
     manager.register_script_message_handler(&window_hash);
+
+    // Sync message handler
+    let sync_ipc_w = window_rc.clone();
+    let sync_ipc_marker = format!("__WRY_SYNC_IPC_{window_hash}__");
+    let sync_ipc_marker_clone = sync_ipc_marker.clone();
+    let sync_ipc_handler = attributes.sync_ipc_handler.take();
+    webview.connect_script_dialog(move |_webview, dialog| {
+      if dialog.dialog_type() == ScriptDialogType::Prompt {
+        if let Some(message) = dialog.message() && message.starts_with(&sync_ipc_marker) {
+          if let Some(sync_ipc_handler) = &sync_ipc_handler {
+            let payload = message[(&sync_ipc_marker).len()..].to_owned();
+            dialog.prompt_set_text(&sync_ipc_handler(&sync_ipc_w, payload));
+            return true;
+          }
+        }
+      }
+      return false;
+    });
 
     // Allow the webview to close it's own window
     let close_window = window_rc.clone();
@@ -306,11 +324,14 @@ impl InnerWebView {
       is_inspector_open,
     };
 
-    // Initialize message handler
+    // Initialize message handlers
     let mut init = String::with_capacity(115 + 20 + 22);
+    init.push_str("(function(){const PROMPT=window.prompt;");
     init.push_str("Object.defineProperty(window, 'ipc', {value: Object.freeze({postMessage:function(x){window.webkit.messageHandlers[\"");
     init.push_str(&window_hash);
-    init.push_str("\"].postMessage(x)}})})");
+    init.push_str("\"].postMessage(x)},postSyncMessage:function(x){PROMPT(\"");
+    init.push_str(&sync_ipc_marker_clone);
+    init.push_str("\"+x)}})})})()");
     w.init(&init)?;
 
     // Initialize scripts
